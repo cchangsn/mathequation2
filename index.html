@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學天平 - 特訓篇</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --pillar-color: #2c5aa0;
+            --beam-color: #4a90e2;
+            --tray-color: #f39c12;
+            --var-color: #ff4d4d;
+            --num-left-color: #27ae60;
+            --num-right-color: #2980b9;
+            --num-10-color: #1e8449;
+            --action-color: #e67e22;
+            --selection-glow: #3498db;
+        }
+
+        body {
+            font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 650px; 
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 15px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .level-info { font-size: 1.1rem; color: #333; font-weight: bold; }
+        .instruction { color: #2980b9; font-size: 1.05rem; font-weight: bold; max-width: 70%; text-align: right; transition: all 0.3s; line-height: 1.4; min-height: 3em; }
+
+        .equation-box {
+            background: #fffbe6;
+            border: 2px dashed #ffe58f;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            min-height: 100px;
+            justify-content: center;
+        }
+
+        .target-prob { font-size: 1.1rem; color: #d35400; font-weight: normal; opacity: 0.8; margin-bottom: 5px; }
+        .equation { font-size: 1.3rem; font-weight: bold; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; text-align: center; justify-content: center; width: 100%; }
+        
+        .eq-side { 
+            padding: 8px 15px; 
+            border-radius: 8px; 
+            background: #e3f2fd; 
+            border: 2px solid #3498db; 
+            transition: all 0.3s;
+            min-width: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .eq-side.active {
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+            transform: scale(1.05);
+            z-index: 2;
+        }
+        
+        .eq-op { color: #2c3e50; font-size: 2.2rem; margin: 0 15px; font-family: serif; min-width: 40px; text-align: center; height: 1em; line-height: 1; }
+        .side-label { font-size: 0.8rem; color: #5d6d7e; margin-bottom: 4px; font-weight: normal; text-transform: uppercase; letter-spacing: 1px; }
+
+        .controls {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 60px; 
+            border: 1px solid #e9ecef;
+        }
+
+        .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+        .toggle-group { display: flex; background: #ddd; border-radius: 20px; padding: 4px; }
+        .toggle-btn { padding: 6px 18px; border-radius: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .toggle-btn.active { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .toggle-btn.add.active { color: #3498db; }
+        .toggle-btn.remove.active { color: #e74c3c; }
+
+        .item-btn {
+            width: 50px; height: 50px; border-radius: 8px; border: 2px solid #ccc;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-weight: bold; background: white; transition: 0.2s;
+            font-size: 1.2rem;
+        }
+        .item-btn:hover:not(:disabled) { transform: translateY(-2px); border-color: #999; }
+        .item-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .item-btn.v { background: var(--var-color); color: white; border-color: #c0392b; }
+        .item-btn.n1 { background: #ecf0f1; color: #333; border-color: #bdc3c7; }
+        .item-btn.n10 { background: #bdc3c7; color: #333; width: 70px; border-style: double; border-width: 3px; }
+        .undo-btn { background: #95a5a6; color: white; border-color: #7f8c8d; font-size: 0.9rem; width: auto; padding: 0 15px; }
+
+        .stage {
+            height: 200px; 
+            width: 100%; position: relative;
+            display: flex; justify-content: center; align-items: flex-end;
+            margin-top: 40px; 
+        }
+
+        .base { position: absolute; bottom: 0; width: 200px; height: 20px; background: #1a3a6c; border-radius: 20px 20px 0 0; z-index: 1; }
+        .main-pillar { position: absolute; bottom: 15px; width: 45px; height: 110px; background: #2c5aa0; clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); z-index: 1; }
+        .pivot-joint { position: absolute; bottom: 120px; width: 22px; height: 22px; background: #95a5a6; border-radius: 50%; border: 3px solid #7f8c8d; z-index: 5; }
+
+        .beam-system {
+            position: absolute; bottom: 127px; width: 500px; height: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-origin: center center;
+            z-index: 10;
+        }
+        .beam-line { position: absolute; width: 100%; height: 12px; background: var(--beam-color); border-radius: 6px; border: 2px solid #1a3a6c; }
+
+        .tray-group {
+            position: absolute; width: 160px; display: flex; flex-direction: column; align-items: center;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            bottom: 5px;
+        }
+        .tray-group.left { left: -15px; transform-origin: center bottom; }
+        .tray-group.right { right: -15px; transform-origin: center bottom; }
+
+        .tray-support-pole { width: 7px; height: 45px; background: #bdc3c7; border-radius: 2px; z-index: 11; }
+        .tray-plate { 
+            width: 100%; height: 14px; background: var(--tray-color); 
+            border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+            border-bottom: 4px solid #d35400; position: relative; z-index: 12;
+            cursor: pointer;
+        }
+
+        .tray-group.selected .tray-plate {
+            box-shadow: 0 0 15px var(--selection-glow);
+            outline: 2.5px solid var(--selection-glow);
+            outline-offset: 2px;
+        }
+
+        .items-area {
+            position: absolute; bottom: 14px; width: 150px; height: 180px; 
+            display: flex; flex-wrap: wrap-reverse; align-content: flex-start; justify-content: center;
+            pointer-events: none; 
+        }
+
+        .block {
+            margin: 1px; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; box-shadow: inset -1.5px -1.5px rgba(0,0,0,0.2);
+            animation: dropIn 0.3s ease-out;
+            cursor: pointer; pointer-events: auto; 
+        }
+        .block.v { width: 22px; height: 22px; background: var(--var-color); font-size: 0.9rem; border: 1px solid #c0392b; }
+        .block.nl, .block.nr { width: 15px; height: 15px; font-size: 0.7rem; }
+        .block.nl { background: var(--num-left-color); }
+        .block.nr { background: var(--num-right-color); }
+        .block.n10 { width: 33px; height: 24px; font-size: 0.85rem; border: 1.5px double rgba(255,255,255,0.4); }
+        .block.n10.nl { background: var(--num-10-color); }
+        .block.n10.nr { background: #1a5276; }
+
+        @keyframes dropIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: white; padding: 25px; border-radius: 12px; max-width: 420px; text-align: center; border: 4px solid var(--pillar-color); line-height: 1.6; }
+        .modal-title { font-size: 1.4rem; color: #d35400; margin-top: 0; margin-bottom: 15px; }
+        .modal-summary { text-align: left; background: #f9f9f9; padding: 15px; border-radius: 8px; font-size: 0.95rem; color: #444; margin: 15px 0; border-left: 5px solid #2ecc71; }
+        .modal .btn { background: var(--pillar-color); color: white; padding: 10px 30px; border: none; border-radius: 20px; cursor: pointer; font-size: 1rem; margin-top: 10px; font-weight: bold; transition: 0.2s; }
+        .modal .btn:hover { background: #1a3a6c; }
+
+        #next-btn { background: #2ecc71; color: white; padding: 10px 30px; border-radius: 25px; border: none; font-size: 1.1rem; cursor: pointer; display: none; margin: 20px auto; font-weight: bold; }
+        .confetti { position: absolute; width: 10px; height: 10px; background: #f00; z-index: 999; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="overlay" class="overlay">
+    <div class="modal" id="modal-container">
+        <h2 id="modal-title" class="modal-title"></h2>
+        <div id="modal-body">
+            <p id="modal-msg"></p>
+        </div>
+        <button id="modal-btn" class="btn" onclick="closeModal()">開始</button>
+    </div>
+</div>
+
+<div class="game-container">
+    <div class="header">
+        <div id="lvl-tag" class="level-info">特訓篇</div>
+        <div id="instruction" class="instruction">請點擊托盤，開始佈置天平。</div>
+    </div>
+
+    <div class="equation-box">
+        <div class="target-prob" id="target-prob">題目：X + 10 = 40</div>
+        <div class="equation" id="eq-display">
+            <div id="eq-left" class="eq-side">
+                <span class="side-label">左邊</span>
+                <div class="content">0</div>
+            </div>
+            <div id="eq-op" class="eq-op"></div>
+            <div id="eq-right" class="eq-side">
+                <span class="side-label">右邊</span>
+                <div class="content">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="row">
+            <div class="toggle-group">
+                <div id="btn-add" class="toggle-btn add active" onclick="setAction('add')">加入 ➕</div>
+                <div id="btn-remove" class="toggle-btn remove" onclick="setAction('remove')">取走 ➖</div>
+            </div>
+            <div id="m-var" class="item-btn v" onclick="performOperation('var')">X</div>
+            <div id="m-10" class="item-btn n10" onclick="performOperation('10')">10</div>
+            <div id="m-1" class="item-btn n1" onclick="performOperation('1')">1</div>
+            <button id="undo-btn" class="item-btn undo-btn" onclick="undo()" title="還原上一個動作">↩ 還原</button>
+        </div>
+    </div>
+
+    <div class="stage">
+        <div class="base"></div>
+        <div class="main-pillar"></div>
+        <div class="pivot-joint"></div>
+
+        <div id="beam-system" class="beam-system">
+            <div class="beam-line"></div>
+            <div id="tray-l" class="tray-group left">
+                <div class="tray-plate" onclick="selectTray('left')">
+                    <div id="area-l" class="items-area"></div>
+                </div>
+                <div class="tray-support-pole"></div>
+            </div>
+            <div id="tray-r" class="tray-group right">
+                <div class="tray-plate" onclick="selectTray('right')">
+                    <div id="area-r" class="items-area"></div>
+                </div>
+                <div class="tray-support-pole"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div style="text-align: center;">
+        <button id="next-btn" onclick="nextLv()">下一關 ➔</button>
+    </div>
+</div>
+
+<script>
+    const fixedLevels = [
+        { title: '特訓篇', prob: 'X + 10 = 40', v: 'X', lV: 1, lN: 10, rV: 0, rN: 40, ans: 30 },
+        { title: '特訓篇', prob: 'X + 11 = 22', v: 'X', lV: 1, lN: 11, rV: 0, rN: 22, ans: 11 },
+        { title: '進階加法', prob: '9 + Y = 11', v: 'Y', lV: 1, lN: 9, rV: 0, rN: 11, ans: 2 }, 
+        { title: '進階加法', prob: '23 + Y = 44', v: 'Y', lV: 1, lN: 23, rV: 0, rN: 44, ans: 21 },
+        { title: '延伸思考', prob: '36 = 21 + W', v: 'W', lV: 0, lN: 36, rV: 1, rN: 21, ans: 15 }
+    ];
+
+    let curIdx = 0;
+    let currentAction = 'add'; 
+    let selectedSide = null;
+    let state = { lN: 0, rN: 0, lV: 0, rV: 0 };
+    let counts = { l: 0, r: 0 }; 
+    let hasMatchedInitial = false;
+    let tempAction = { left: [], right: [] }; 
+    let stableState = { lN: 0, rN: 0, lV: 0, rV: 0 };
+    
+    let isReverting = false; 
+    let isTransitioning = false; 
+    let currentShock = null; 
+
+    let history = [];
+
+    function saveToHistory() {
+        history.push(JSON.parse(JSON.stringify({
+            state,
+            counts,
+            tempAction,
+            stableState,
+            hasMatchedInitial,
+            currentAction,
+            selectedSide
+        })));
+        updateUndoButton();
+    }
+
+    function undo() {
+        if (history.length === 0 || isTransitioning || isReverting) return;
+        const prevState = history.pop();
+        state = prevState.state;
+        counts = prevState.counts;
+        tempAction = prevState.tempAction;
+        stableState = prevState.stableState;
+        hasMatchedInitial = prevState.hasMatchedInitial;
+        currentAction = prevState.currentAction;
+        selectedSide = prevState.selectedSide;
+        document.getElementById('btn-add').classList.toggle('active', currentAction === 'add');
+        document.getElementById('btn-remove').classList.toggle('active', currentAction === 'remove');
+        document.getElementById('tray-l').classList.toggle('selected', selectedSide === 'left');
+        document.getElementById('tray-r').classList.toggle('selected', selectedSide === 'right');
+        updateUndoButton();
+        render();
+    }
+
+    function updateUndoButton() {
+        document.getElementById('undo-btn').disabled = (history.length === 0);
+    }
+
+    function setAction(a) {
+        if (isTransitioning) return;
+        currentAction = a;
+        document.getElementById('btn-add').classList.toggle('active', a === 'add');
+        document.getElementById('btn-remove').classList.toggle('active', a === 'remove');
+    }
+
+    function selectTray(side) {
+        if (isReverting || isTransitioning) return;
+        selectedSide = side;
+        document.getElementById('tray-l').classList.toggle('selected', side === 'left');
+        document.getElementById('tray-r').classList.toggle('selected', side === 'right');
+        render();
+    }
+
+    function performOperation(itemType) {
+        if (isReverting || isTransitioning) return;
+        if (!selectedSide) {
+            showModal("溫馨提示", "先點選一個托盤（左或右），再選擇要移動的物品。", "我知道了");
+            return;
+        }
+        const lv = fixedLevels[curIdx];
+        const isL = selectedSide === 'left';
+        let amount = (itemType === '10') ? 10 : 1;
+        saveToHistory();
+        let backupState = JSON.parse(JSON.stringify(state));
+        let backupCounts = JSON.parse(JSON.stringify(counts));
+        let backupTempAction = JSON.parse(JSON.stringify(tempAction));
+        
+        if (currentAction === 'add') {
+            if (isL) { if (itemType === 'var') state.lV++; else state.lN += amount; counts.l++; }
+            else { if (itemType === 'var') state.rV++; else state.rN += amount; counts.r++; }
+        } else {
+            if (isL) {
+                if (itemType === 'var' && state.lV > 0) { state.lV--; counts.l--; }
+                else if (itemType !== 'var' && state.lN >= amount) { state.lN -= amount; counts.l--; }
+                else { history.pop(); return; } 
+            } else {
+                if (itemType === 'var' && state.rV > 0) { state.rV--; counts.r--; }
+                else if (itemType !== 'var' && state.rN >= amount) { state.rN -= amount; counts.r--; }
+                else { history.pop(); return; }
+            }
+        }
+
+        if (hasMatchedInitial) {
+            let list = tempAction[selectedSide];
+            let last = list.length > 0 ? list[list.length - 1] : null;
+            if (last && last.type === currentAction && last.item === itemType && itemType !== 'var') {
+                last.val += amount;
+            } else {
+                list.push({ type: currentAction, item: itemType, val: amount });
+            }
+        }
+
+        let errorMsg = "";
+        if (!hasMatchedInitial) {
+            if (currentAction === 'remove') {
+                errorMsg = "現在是『佈置題目』的階段，我們需要把東西放上去，不需要拿走喔！請切換到『加入➕』。";
+            } else if (state.lV > lv.lV || state.lN > lv.lN) {
+                errorMsg = "再看清楚方程左邊的數字是多少。";
+            } else if (state.rV > lv.rV || state.rN > lv.rN) {
+                errorMsg = "再看清楚方程右邊的數字是多少。";
+            }
+        } else {
+            if (currentAction === 'add') {
+                errorMsg = `我們現在的目標是把 ${lv.v} 周邊的東西清空。加入更多物品會越來越複雜喔。`;
+            } else {
+                if (itemType === 'var' && state.lV === 0 && state.rV === 0) {
+                    errorMsg = `如果把 ${lv.v} 拿走的話，我們就找不到它的重量了！`;
+                }
+            }
+        }
+
+        if (errorMsg !== "") {
+            isReverting = true;
+            render(); 
+            setTimeout(() => {
+                showModal("想一想 🤔", errorMsg, "我明白了，復原上一步", () => {
+                    state = backupState;
+                    counts = backupCounts;
+                    tempAction = backupTempAction;
+                    isReverting = false;
+                    history.pop();
+                    updateUndoButton();
+                    render();
+                });
+            }, 800);
+            return; 
+        }
+
+        currentShock = { 
+            side: selectedSide, 
+            action: currentAction, 
+            amount: itemType === 'var' ? 10 : amount 
+        };
+        
+        checkAndSimplify();
+        render();
+    }
+
+    function checkAndSimplify() {
+        if (!hasMatchedInitial) return;
+        const lv = fixedLevels[curIdx];
+        const wL = state.lV * lv.ans + state.lN;
+        const wR = state.rV * lv.ans + state.rN;
+        if (wL === wR && tempAction.left.length > 0 && tempAction.right.length > 0) {
+            let lActions = tempAction.left;
+            let rActions = tempAction.right;
+            let matchedAll = lActions.every(l => rActions.some(r => r.type === l.type && r.item === l.item && r.val === l.val)) &&
+                             rActions.every(r => lActions.some(l => l.type === r.type && l.item === r.item && l.val === r.val));
+            if (matchedAll) {
+                isTransitioning = true;
+                render(); 
+                setTimeout(() => {
+                    saveToHistory();
+                    stableState = JSON.parse(JSON.stringify(state));
+                    tempAction = { left: [], right: [] };
+                    isTransitioning = false;
+                    render(); 
+                }, 1500);
+            }
+        }
+    }
+
+    function resetLv() {
+        const lv = fixedLevels[curIdx];
+        state = { lN: 0, rN: 0, lV: 0, rV: 0 };
+        counts = { l: 0, r: 0 };
+        stableState = { lN: 0, rN: 0, lV: 0, rV: 0 };
+        tempAction = { left: [], right: [] };
+        history = [];
+        hasMatchedInitial = false;
+        selectedSide = null;
+        isReverting = false;
+        isTransitioning = false;
+        currentShock = null;
+        document.getElementById('tray-l').classList.remove('selected');
+        document.getElementById('tray-r').classList.remove('selected');
+        document.getElementById('lvl-tag').textContent = lv.title;
+        document.getElementById('m-var').textContent = lv.v;
+        document.getElementById('target-prob').textContent = `題目：${lv.prob}`;
+        document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('instruction').textContent = "請點擊托盤，並根據題目『加入』對應物品。";
+        document.getElementById('instruction').style.color = "#2980b9";
+        updateUndoButton();
+        setAction('add');
+        render();
+    }
+
+    function render() {
+        const lv = fixedLevels[curIdx];
+        draw('area-l', state.lV, state.lN, lv.v, 'nl', 'left');
+        draw('area-r', state.rV, state.rN, lv.v, 'nr', 'right');
+        
+        const wL = state.lV * lv.ans + state.lN;
+        const wR = state.rV * lv.ans + state.rN;
+        
+        let targetTilt = 0;
+        if (wL !== wR) {
+            const weightDiff = wL - wR;
+            const tiltDirection = weightDiff > 0 ? -1 : 1;
+            targetTilt = tiltDirection * Math.min(Math.abs(weightDiff) * 0.5 + 8, 22);
+        }
+
+        const beam = document.getElementById('beam-system');
+        const trayL = document.getElementById('tray-l');
+        const trayR = document.getElementById('tray-r');
+
+        if (currentShock) {
+            const side = currentShock.side;
+            const action = currentShock.action;
+            const amt = currentShock.amount;
+            let shockImpact = (side === 'left') ? -1 : 1;
+            if (action === 'remove') shockImpact *= -1;
+            const magnitude = amt >= 10 ? 8 : 4;
+            const shockTilt = targetTilt + (shockImpact * magnitude);
+            
+            beam.style.transition = "transform 0.1s ease-out";
+            trayL.style.transition = "transform 0.1s ease-out";
+            trayR.style.transition = "transform 0.1s ease-out";
+            beam.style.transform = `rotate(${shockTilt}deg)`;
+            trayL.style.transform = `rotate(${-shockTilt}deg)`;
+            trayR.style.transform = `rotate(${-shockTilt}deg)`;
+            
+            setTimeout(() => {
+                beam.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                trayL.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                trayR.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                beam.style.transform = `rotate(${targetTilt}deg)`;
+                trayL.style.transform = `rotate(${-targetTilt}deg)`;
+                trayR.style.transform = `rotate(${-targetTilt}deg)`;
+            }, 100);
+            currentShock = null;
+        } else {
+            beam.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+            trayL.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+            trayR.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+            beam.style.transform = `rotate(${targetTilt}deg)`;
+            trayL.style.transform = `rotate(${-targetTilt}deg)`;
+            trayR.style.transform = `rotate(${-targetTilt}deg)`;
+        }
+
+        renderEquation(wL, wR);
+        updateGameState(wL, wR);
+    }
+
+    function renderEquation(wL, wR) {
+        const lv = fixedLevels[curIdx];
+        const leftEl = document.getElementById('eq-left');
+        const rightEl = document.getElementById('eq-right');
+        const opEl = document.getElementById('eq-op');
+        const isBalanced = (wL === wR);
+        opEl.textContent = isBalanced ? "=" : "";
+
+        leftEl.classList.toggle('active', selectedSide === 'left');
+        const leftContent = !hasMatchedInitial ? format(state.lV, state.lN, lv.v) : buildSideHTML(stableState.lV, stableState.lN, tempAction.left, lv.v);
+        leftEl.querySelector('.content').innerHTML = leftContent;
+
+        rightEl.classList.toggle('active', selectedSide === 'right');
+        const rightContent = !hasMatchedInitial ? format(state.rV, state.rN, lv.v) : buildSideHTML(stableState.rV, stableState.rN, tempAction.right, lv.v);
+        rightEl.querySelector('.content').innerHTML = rightContent;
+    }
+
+    function buildSideHTML(v, n, actions, varName) {
+        let base = format(v, n, varName);
+        if (actions.length === 0) return base;
+        let html = base === "0" ? "" : base;
+        actions.forEach((a, i) => {
+            const displayVal = (a.item === 'var' ? varName : a.val);
+            const symbol = a.type === 'add' ? '+' : '-';
+            const color = a.type === 'add' ? '#3498db' : '#e74c3c';
+            if (i === 0 && html === "") {
+                 html += `<span style="color: ${color}; font-weight: bold;">${symbol==='-'?'-':''} ${displayVal}</span>`;
+            } else {
+                 html += ` <span style="color: ${color}; font-weight: bold;">${symbol} ${displayVal}</span>`;
+            }
+        });
+        return html;
+    }
+
+    function updateGameState(wL, wR) {
+        if (isReverting || isTransitioning) return; 
+        const lv = fixedLevels[curIdx];
+        const instructionEl = document.getElementById('instruction');
+        if (!hasMatchedInitial) {
+            if (state.lV === lv.lV && state.lN === lv.lN && state.rV === lv.rV && state.rN === lv.rN) {
+                saveToHistory();
+                hasMatchedInitial = true;
+                stableState = JSON.parse(JSON.stringify(state));
+                showModal("佈置完成！", `天平已平衡，完整方程式已顯示。<br><br>現在可利用天平原理解這道方程。<br>想想怎樣可以把未知數獨留在一邊。`, "開始挑戰");
+                instructionEl.textContent = "現在可利用天平原理解這道方程。想想怎樣可以把未知數獨留在一邊。";
+                setAction('remove');
+                render(); 
+            }
+        } else {
+            if (wL === wR) {
+                const leftSolved = (state.lV === 1 && state.lN === 0 && state.rV === 0 && state.rN > 0);
+                const rightSolved = (state.rV === 1 && state.rN === 0 && state.lV === 0 && state.lN > 0);
+                if (leftSolved || rightSolved) {
+                    instructionEl.innerHTML = `成功了！你求得 ${lv.v} = ${leftSolved ? state.rN : state.lN}！ 🎉`;
+                    instructionEl.style.color = "#27ae60";
+                    document.getElementById('next-btn').style.display = 'inline-block';
+                    
+                    // 如果是最後一關
+                    if (curIdx === fixedLevels.length - 1) {
+                        setTimeout(() => {
+                            showSummary();
+                        }, 1000);
+                    }
+                } else {
+                    instructionEl.textContent = "很好！天平平衡中，請繼續想辦法把未知數獨留在一邊。";
+                    instructionEl.style.color = "#2980b9";
+                    document.getElementById('next-btn').style.display = 'none';
+                }
+            } else {
+                instructionEl.textContent = "天平失衡了！另一邊可怎樣辦？";
+                instructionEl.style.color = "#e74c3c"; 
+                document.getElementById('next-btn').style.display = 'none';
+            }
+        }
+    }
+
+    function showSummary() {
+        const body = document.getElementById('modal-body');
+        document.getElementById('modal-title').textContent = "🎊 任務圓滿完成！";
+        body.innerHTML = `
+            <p>太棒了！你已經成功解開了所有的代數難題。讓我們回顧一下你掌握的強大技巧：</p>
+            <div class="modal-summary">
+                <b>1. 等量公理：</b> 只要對天平兩邊進行相同的動作（同時加、同時減），天平就會保持平衡。<br>
+                <b>2. 移項法則：</b> 為了找出未知數重量，你的目標始終是把未知數「孤立」在一邊。<br>
+                <b>3. 物理與邏輯：</b> 每一道數學運算，在現實中都有對應的平衡動作。
+            </div>
+            <p>你已經展現了出色的邏輯思維與解題耐性！</p>
+        `;
+        document.getElementById('modal-btn').textContent = "再玩一次";
+        document.getElementById('modal-btn').onclick = () => {
+            curIdx = 0;
+            closeModal();
+            resetLv();
+            document.getElementById('modal-btn').onclick = closeModal; // 重置按鈕行為
+        };
+        document.getElementById('overlay').style.display = 'flex';
+        createConfetti();
+    }
+
+    function createConfetti() {
+        for(let i=0; i<50; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+            c.style.top = '-10px';
+            document.body.appendChild(c);
+            const speed = Math.random() * 3 + 2;
+            const rot = Math.random() * 360;
+            let currentY = -10;
+            const anim = setInterval(() => {
+                currentY += speed;
+                c.style.top = currentY + 'px';
+                c.style.transform = `rotate(${currentY + rot}deg)`;
+                if (currentY > window.innerHeight) {
+                    clearInterval(anim);
+                    c.remove();
+                }
+            }, 20);
+        }
+    }
+
+    function format(v, n, name) {
+        const lv = fixedLevels[curIdx];
+        let vt = v === 0 ? "" : (v === 1 ? name : v + name);
+        let nt = n === 0 ? "" : n;
+        if (!vt && !nt) return "0";
+        if (vt && nt) {
+            if (lv.prob.indexOf(name) < lv.prob.indexOf(nt.toString())) return `${vt} + ${nt}`;
+            else return `${nt} + ${vt}`;
+        }
+        return vt || nt;
+    }
+
+    function draw(id, v, n, name, nClass, side) {
+        const el = document.getElementById(id); el.innerHTML = '';
+        for(let i=0; i<v; i++) {
+            const b = document.createElement('div'); b.className = 'block v'; b.textContent = name;
+            b.onclick = (e) => { e.stopPropagation(); quickRemove(side, 'var'); }; el.appendChild(b);
+        }
+        const c10 = Math.floor(n/10), c1 = n%10;
+        for(let i=0; i<c10; i++) {
+            const b = document.createElement('div'); b.className = `block n10 ${nClass}`; b.textContent = '10';
+            b.onclick = (e) => { e.stopPropagation(); quickRemove(side, '10'); }; el.appendChild(b);
+        }
+        for(let i=0; i<c1; i++) {
+            const b = document.createElement('div'); b.className = `block ${nClass}`; b.textContent = '1';
+            b.onclick = (e) => { e.stopPropagation(); quickRemove(side, '1'); }; el.appendChild(b);
+        }
+    }
+
+    function quickRemove(side, itemType) {
+        if (isTransitioning) return;
+        selectedSide = side;
+        setAction('remove');
+        performOperation(itemType);
+    }
+
+    let modalCallback = null;
+    function showModal(title, msg, btnText = "開始", callback = null) {
+        const body = document.getElementById('modal-body');
+        document.getElementById('modal-title').textContent = title;
+        body.innerHTML = `<p id="modal-msg">${msg}</p>`;
+        document.getElementById('modal-btn').textContent = btnText;
+        modalCallback = callback;
+        document.getElementById('overlay').style.display = 'flex';
+    }
+
+    function closeModal() { 
+        document.getElementById('overlay').style.display = 'none'; 
+        if (modalCallback) {
+            modalCallback();
+            modalCallback = null;
+        }
+    }
+    
+    function nextLv() { curIdx = (curIdx + 1) % fixedLevels.length; resetLv(); }
+    window.onload = resetLv;
+</script>
+
+</body>
+</html>
